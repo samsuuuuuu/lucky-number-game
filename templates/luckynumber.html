@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Number Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='luckynumber.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Lucky Number Game</h1>
+        <p class="subtitle">Guess a number between 1 and 50</p>
+        
+        <div class="game-box">
+            <div id="gameContent">
+                <input 
+                    type="number" 
+                    id="userInput" 
+                    min="1" 
+                    max="50" 
+                    placeholder="Enter a number..."
+                    class="input-field"
+                >
+                <button onclick="guessNumber()" class="btn-guess">Guess</button>
+                
+                <div id="feedback" class="feedback"></div>
+                <div id="attempts" class="attempts"></div>
+            </div>
+            
+            <div id="gameOver" class="game-over hidden">
+                <h2>You Won!</h2>
+                <p id="resultMessage"></p>
+                <button onclick="resetGame()" class="btn-restart">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function guessNumber() {
+            const userInput = document.getElementById('userInput');
+            const usernum = parseInt(userInput.value);
+            const feedback = document.getElementById('feedback');
+
+            if (isNaN(usernum) || usernum < 1 || usernum > 50) {
+                feedback.innerHTML = 'Please enter a valid number between 1 and 50';
+                feedback.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Send guess to Python backend
+            fetch('/api/guess', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ usernum: usernum })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'won') {
+                    document.getElementById('gameContent').classList.add('hidden');
+                    document.getElementById('gameOver').classList.remove('hidden');
+                    document.getElementById('resultMessage').innerHTML = `
+                        Game Over! You Won!<br>
+                        The lucky number was <strong>${data.lucky_number}</strong><br>
+                        You took <strong>${data.attempts}</strong> attempt${data.attempts > 1 ? 's' : ''}
+                    `;
+                } else {
+                    feedback.innerHTML = data.message;
+                    if (data.message.includes('Low')) {
+                        feedback.style.color = '#ffa500';
+                    } else {
+                        feedback.style.color = '#ff6b6b';
+                    }
+                    document.getElementById('attempts').innerHTML = 'Attempts: ' + data.attempts;
+                }
+                userInput.value = '';
+                userInput.focus();
+            });
+        }
+
+        function resetGame() {
+            fetch('/api/reset', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('gameContent').classList.remove('hidden');
+                document.getElementById('gameOver').classList.add('hidden');
+                document.getElementById('feedback').innerHTML = '';
+                document.getElementById('attempts').innerHTML = '';
+                document.getElementById('userInput').value = '';
+                document.getElementById('userInput').focus();
+            });
+        }
+
+        // Allow Enter key to submit
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('userInput').addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    guessNumber();
+                }
+            });
+            document.getElementById('userInput').focus();
+        });
+    </script>
+</body>
+</html>
